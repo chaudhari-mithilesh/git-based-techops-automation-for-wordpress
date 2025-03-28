@@ -1,0 +1,100 @@
+name: Clone WordPress Site
+
+on:
+  workflow_dispatch:
+    inputs:
+      site_name:
+        description: 'Name of the site to clone'
+        required: true
+        type: string
+      environment:
+        description: 'Target environment (staging/production)'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  clone-site:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'npm'
+          
+      - name: Install Dependencies
+        run: |
+          npm install -g backstopjs
+          npm install puppeteer
+          npm install @wordpress/env
+          
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.LIVE_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.STAGING_HOST }} >> ~/.ssh/known_hosts
+          
+      - name: Clone Site
+        env:
+          LIVE_HOST: ${{ secrets.LIVE_HOST }}
+          LIVE_USER: ${{ secrets.LIVE_USER }}
+          LIVE_PASSWORD: ${{ secrets.LIVE_PASSWORD }}
+          LIVE_DB_HOST: ${{ secrets.LIVE_DB_HOST }}
+          LIVE_DB_USER: ${{ secrets.LIVE_DB_USER }}
+          LIVE_DB_PASS: ${{ secrets.LIVE_DB_PASS }}
+          LIVE_DB_NAME: ${{ secrets.LIVE_DB_NAME }}
+          STAGING_HOST: ${{ secrets.STAGING_HOST }}
+          STAGING_USER: ${{ secrets.STAGING_USER }}
+          STAGING_PASSWORD: ${{ secrets.STAGING_PASSWORD }}
+          STAGING_DB_HOST: ${{ secrets.STAGING_DB_HOST }}
+          STAGING_DB_USER: ${{ secrets.STAGING_DB_USER }}
+          STAGING_DB_PASS: ${{ secrets.STAGING_DB_PASS }}
+          STAGING_DB_NAME: ${{ secrets.STAGING_DB_NAME }}
+          SITE_NAME: ${{ github.event.inputs.site_name }}
+        run: ./scripts/clone-site.sh
+        
+      - name: Run Visual Regression Tests
+        run: |
+          cd tests
+          backstop test
+        
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          commit-message: "chore: Clone site ${{ github.event.inputs.site_name }} from live to ${{ github.event.inputs.environment }}"
+          title: "Clone site: ${{ github.event.inputs.site_name }}"
+          body: |
+            Automated site clone from live to ${{ github.event.inputs.environment }}.
+            
+            Changes made:
+            - Database migrated
+            - Files synced
+            - Visual regression tests passed
+            
+            Please review the changes before merging.
+            
+      - name: Notify on Completion
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const message = `Site clone operation for ${{ github.event.inputs.site_name }} has completed.
+            Status: ${{ job.status }}
+            Environment: ${{ github.event.inputs.environment }}
+            Pull Request: ${{ steps.create-pr.outputs.pull-request-url }}`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            }); 

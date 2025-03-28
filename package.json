@@ -1,0 +1,30 @@
+{
+  "name": "wordpress-automation",
+  "version": "1.0.0",
+  "description": "WordPress site automation tool for cloning and testing",
+  "main": "index.js",
+  "scripts": {
+    "test": "backstop test",
+    "test:reference": "backstop reference",
+    "test:openReport": "backstop openReport",
+    "lint": "eslint .",
+    "format": "prettier --write ."
+  },
+  "keywords": [
+    "wordpress",
+    "automation",
+    "testing",
+    "backstopjs"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@wordpress/env": "^8.0.0",
+    "backstopjs": "^6.1.0",
+    "puppeteer": "^19.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.0.0",
+    "prettier": "^2.8.0"
+  }
+} 

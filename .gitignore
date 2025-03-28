@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Testing
+backstop_data/
+coverage/
+
+# Temporary files
+tmp/
+temp/
+
+# WordPress specific
+wp-config.php
+wp-content/uploads/
+wp-content/cache/
+wp-content/backup-db/
+wp-content/backups/
+
+# Backup files
+*.sql
+*.tar.gz
+*.zip
+
+# SSH
+.ssh/
+*.pem
+*.key
+
+# Local development
+*.local 

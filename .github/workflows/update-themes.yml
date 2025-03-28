@@ -1,0 +1,104 @@
+name: Update WordPress Themes
+
+on:
+  workflow_dispatch:
+    inputs:
+      site_name:
+        description: 'Name of the site to update'
+        required: true
+        type: string
+      environment:
+        description: 'Target environment (staging/production)'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      update_type:
+        description: 'Type of update'
+        required: true
+        type: choice
+        options:
+          - all
+          - selected
+      theme_list:
+        description: 'Comma-separated list of themes to update (if selected)'
+        required: false
+        type: string
+
+jobs:
+  update-themes:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'npm'
+          
+      - name: Install Dependencies
+        run: |
+          npm install -g backstopjs
+          npm install puppeteer
+          npm install @wordpress/env
+          
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.STAGING_HOST }} >> ~/.ssh/known_hosts
+          
+      - name: Update Themes
+        env:
+          STAGING_HOST: ${{ secrets.STAGING_HOST }}
+          STAGING_USER: ${{ secrets.STAGING_USER }}
+          STAGING_PASSWORD: ${{ secrets.STAGING_PASSWORD }}
+          SITE_NAME: ${{ github.event.inputs.site_name }}
+          UPDATE_TYPE: ${{ github.event.inputs.update_type }}
+          THEME_LIST: ${{ github.event.inputs.theme_list }}
+        run: ./scripts/update-themes.sh
+        
+      - name: Run Visual Regression Tests
+        run: |
+          cd tests
+          backstop test
+        
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          commit-message: "chore: Update themes for ${{ github.event.inputs.site_name }}"
+          title: "Theme Updates: ${{ github.event.inputs.site_name }}"
+          body: |
+            Automated theme updates for ${{ github.event.inputs.site_name }}.
+            
+            Update Type: ${{ github.event.inputs.update_type }}
+            Themes Updated: ${{ github.event.inputs.theme_list || 'All' }}
+            
+            Changes made:
+            - Themes updated
+            - Visual regression tests passed
+            
+            Please review the changes before merging.
+            
+      - name: Notify on Completion
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const message = `Theme update operation for ${{ github.event.inputs.site_name }} has completed.
+            Status: ${{ job.status }}
+            Environment: ${{ github.event.inputs.environment }}
+            Update Type: ${{ github.event.inputs.update_type }}
+            Pull Request: ${{ steps.create-pr.outputs.pull-request-url }}`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            }); 

@@ -1,0 +1,68 @@
+{
+  "id": "wordpress-clone-test",
+  "viewports": [
+    {
+      "label": "desktop",
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "label": "tablet",
+      "width": 768,
+      "height": 1024
+    },
+    {
+      "label": "mobile",
+      "width": 375,
+      "height": 667
+    }
+  ],
+  "scenarios": [
+    {
+      "label": "Homepage",
+      "url": "https://${STAGING_HOST}/${SITE_NAME}",
+      "selectors": ["viewport"],
+      "delay": 5000,
+      "hideSelectors": [
+        ".wp-admin-bar",
+        "#wp-admin-bar-root-default",
+        ".wp-admin-bar-top"
+      ]
+    },
+    {
+      "label": "Admin Login",
+      "url": "https://${STAGING_HOST}/${SITE_NAME}/wp-admin",
+      "selectors": ["#login"],
+      "delay": 3000
+    },
+    {
+      "label": "Posts Page",
+      "url": "https://${STAGING_HOST}/${SITE_NAME}/blog",
+      "selectors": ["main", "article"],
+      "delay": 3000
+    }
+  ],
+  "paths": {
+    "bitmaps_reference": "backstop_data/bitmaps_reference",
+    "bitmaps_test": "backstop_data/bitmaps_test",
+    "engine_scripts": "backstop_data/engine_scripts",
+    "html_report": "backstop_data/html_report",
+    "ci_report": "backstop_data/ci_report"
+  },
+  "engine": "puppeteer",
+  "engineOptions": {
+    "args": ["--no-sandbox"]
+  },
+  "asyncCaptureLimit": 5,
+  "asyncCompareLimit": 50,
+  "debug": false,
+  "debugWindow": false,
+  "report": ["browser", "CI"],
+  "ci": {
+    "format": "junit",
+    "testReportFileName": "ci-report",
+    "testSuiteNameTemplate": "{configPath}",
+    "testCaseNameTemplate": "{scenarioLabel}",
+    "reportPath": "./backstop_data/ci_report/xunit.xml"
+  }
+} 
