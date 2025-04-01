@@ -1,1 +1,108 @@
- 
+name: Update WordPress Plugins
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Run weekly on Sunday at midnight
+  workflow_dispatch:
+    inputs:
+      site_url:
+        description: 'WordPress site URL'
+        required: true
+        type: string
+      plugins:
+        description: 'Comma-separated list of plugins to update'
+        required: false
+        type: string
+
+jobs:
+  update-plugins:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          tools: composer
+          
+      - name: Install WP-CLI
+        run: |
+          curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+          chmod +x wp-cli.phar
+          sudo mv wp-cli.phar /usr/local/bin/wp
+          
+      - name: Configure Git
+        run: |
+          git config --global user.name 'GitHub Actions'
+          git config --global user.email 'github-actions@github.com'
+          
+      - name: Load configuration
+        run: |
+          echo "Loading configuration..."
+          source scripts/utils.sh
+          load_config
+          
+      - name: Update plugins
+        run: |
+          # Get input parameters
+          SITE_URL="${{ github.event.inputs.site_url }}"
+          PLUGINS="${{ github.event.inputs.plugins }}"
+          
+          # If no specific plugins provided, update all
+          if [ -z "$PLUGINS" ]; then
+            PLUGINS=$(wp plugin list --path="$SITE_URL" --format=csv --fields=name --skip-plugins --skip-themes)
+          fi
+          
+          # Create branch for updates
+          BRANCH_NAME="update-plugins-$(date +%Y%m%d)"
+          git checkout -b "$BRANCH_NAME"
+          
+          # Update each plugin
+          for plugin in $PLUGINS; do
+            echo "Updating plugin: $plugin"
+            
+            # Get current version
+            CURRENT_VERSION=$(wp plugin list --path="$SITE_URL" --format=csv --fields=name,version | grep "^$plugin," | cut -d',' -f2)
+            
+            # Update plugin
+            wp plugin update "$plugin" --path="$SITE_URL" --skip-plugins --skip-themes
+            
+            # Get new version
+            NEW_VERSION=$(wp plugin list --path="$SITE_URL" --format=csv --fields=name,version | grep "^$plugin," | cut -d',' -f2)
+            
+            if [ "$CURRENT_VERSION" != "$NEW_VERSION" ]; then
+              echo "Plugin $plugin updated from $CURRENT_VERSION to $NEW_VERSION"
+              
+              # Commit changes
+              git add .
+              git commit -m "[TechOps] Update $plugin from $CURRENT_VERSION to $NEW_VERSION"
+            else
+              echo "Plugin $plugin is already up to date"
+            fi
+          done
+          
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          title: '[TechOps] Update WordPress Plugins'
+          body: |
+            Automated plugin updates:
+            - Updated plugins: ${{ github.event.inputs.plugins }}
+            - Site URL: ${{ github.event.inputs.site_url }}
+            
+            Please review the changes before merging.
+          branch: ${{ github.event.inputs.branch }}
+          delete-branch: true
+          
+      - name: Notify on completion
+        if: always()
+        run: |
+          # Send notification based on configuration
+          if [ -n "$(get_config_value 'notifications.slack_webhook')" ]; then
+            curl -X POST -H 'Content-type: application/json' \
+              --data "{\"text\":\"Plugin update workflow completed for ${{ github.event.inputs.site_url }}\"}" \
+              "$(get_config_value 'notifications.slack_webhook')"
+          fi 

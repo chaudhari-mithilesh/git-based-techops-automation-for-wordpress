@@ -1,444 +1,212 @@
-# WordPress Site Automation - Testing Guide
-
-## Table of Contents
-1. [Prerequisites](#prerequisites)
-2. [Installation Guide](#installation-guide)
-3. [Test Environment Setup](#test-environment-setup)
-4. [Test Cases](#test-cases)
-5. [Visual Regression Testing](#visual-regression-testing)
-6. [Performance Testing](#performance-testing)
-7. [Security Testing](#security-testing)
+# Testing Guide
 
 ## Prerequisites
 
-### System Requirements
-- Operating System: Ubuntu 20.04 LTS or higher
-- CPU: 2 cores minimum
-- RAM: 4GB minimum
-- Storage: 20GB free space
-- Network: Stable internet connection
+Before starting the testing process, ensure you have the following prerequisites installed:
 
-### Software Requirements
-1. **Node.js Environment**
-   - Node.js v16.x or higher
-   - npm v8.x or higher
-   - nvm (Node Version Manager) recommended
+1. Operating System:
+   - Ubuntu 20.04 LTS or higher
+   - At least 4GB RAM
+   - At least 20GB free disk space
 
-2. **Database**
-   - MySQL 5.7 or higher
-   - MariaDB 10.3 or higher
-   - Database user with full privileges
-
-3. **WordPress Environment**
-   - WordPress CLI installed globally
-   - PHP 7.4 or higher
-   - Required PHP extensions:
-     - mysqli
-     - curl
-     - zip
-     - gd
-     - xml
-     - mbstring
-
-4. **Testing Tools**
-   - BackstopJS v6.x
-   - Puppeteer v19.x
-   - Chrome/Chromium browser
+2. Required Software:
+   - Docker and Docker Compose
+   - Node.js 14.0 or higher
    - Git
+   - WP-CLI
 
-### Access Requirements
-1. **Server Access**
-   - SSH access to staging server
-   - SSH access to live server
-   - Sudo privileges on both servers
+## Initial Setup
 
-2. **Database Access**
-   - Read access to live database
-   - Write access to staging database
-   - Database backup permissions
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd git-based-techops-automation-for-wordpress
+   ```
 
-3. **GitHub Access**
-   - Repository access
-   - Actions permissions
-   - Secrets management access
+2. Run the setup script:
+   ```bash
+   chmod +x scripts/setup.sh
+   ./scripts/setup.sh
+   ```
 
-## Installation Guide
+3. Start the Docker environment:
+   ```bash
+   docker-compose up -d
+   ```
 
-### 1. Node.js Setup
+4. Verify the test site is accessible:
+   - Open http://localhost:8080 in your browser
+   - Log in with admin/password
+
+## Test Environment
+
+The test environment includes:
+
+1. Test WordPress Site:
+   - URL: http://localhost:8080
+   - Admin credentials: admin/password
+   - Database: wordpress/wordpress/wordpress
+
+2. Test Plugins:
+   - Hello Dolly (for testing plugin updates)
+
+3. Test Themes:
+   - Twenty Twenty (for testing theme updates)
+
+## Running Tests
+
+### 1. Unit Tests
+
+Run unit tests for individual components:
+
 ```bash
-# Install nvm
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-
-# Reload shell configuration
-source ~/.bashrc
-
-# Install Node.js
-nvm install 16
-nvm use 16
-
-# Verify installation
-node --version
-npm --version
+npm run test:unit
 ```
 
-### 2. WordPress CLI Setup
+### 2. Integration Tests
+
+Run integration tests for the complete workflow:
+
 ```bash
-# Download WordPress CLI
-curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
-
-# Make it executable
-chmod +x wp-cli.phar
-
-# Move to system path
-sudo mv wp-cli.phar /usr/local/bin/wp
-
-# Verify installation
-wp --info
+npm run test:integration
 ```
 
-### 3. Project Setup
+### 3. Shell Script Tests
+
+Run tests for shell scripts:
+
 ```bash
-# Clone repository
-git clone https://github.com/your-org/wordpress-automation.git
-cd wordpress-automation
-
-# Install dependencies
-npm install
-
-# Install global dependencies
-npm install -g backstopjs
-npm install -g @wordpress/env
-
-# Set up environment variables
-cp .env.example .env
-# Edit .env with your configuration
+./tests/run_tests.sh
 ```
 
-### 4. Database Setup
+### 4. Full Test Suite
+
+Run all tests:
+
 ```bash
-# Create test database
-mysql -u root -p
-CREATE DATABASE wp_test;
-CREATE USER 'wp_test_user'@'localhost' IDENTIFIED BY 'your_password';
-GRANT ALL PRIVILEGES ON wp_test.* TO 'wp_test_user'@'localhost';
-FLUSH PRIVILEGES;
-```
-
-## Test Environment Setup
-
-### 1. Local WordPress Environment
-```bash
-# Start WordPress environment
-wp-env start
-
-# Create test database
-wp-env run cli wp db create
-
-# Install WordPress
-wp-env run cli wp core install --url=http://localhost:8888 --title="Test Site" --admin_user=admin --admin_password=password --admin_email=admin@example.com
-```
-
-### 2. Test Data Setup
-```bash
-# Import test content
-wp-env run cli wp import wp-content/plugins/wordpress-importer/sample/sample_products.xml --authors=create
-
-# Create test users
-wp-env run cli wp user create testuser testuser@example.com --role=editor
-wp-env run cli wp user create testadmin testadmin@example.com --role=administrator
-```
-
-### 3. Test Plugins and Themes
-```bash
-# Install test plugins
-wp-env run cli wp plugin install woocommerce --activate
-wp-env run cli wp plugin install wordpress-seo --activate
-
-# Install test themes
-wp-env run cli wp theme install twentytwentythree --activate
+npm run test
 ```
 
 ## Test Cases
 
-### 1. Site Cloning Tests
+### 1. Site Cloning Test
 
-#### Database Migration Test
 ```bash
-# Test database backup
-wp db export backup.sql
+# Test cloning a site
+./scripts/clone-site.sh http://localhost:8080 cloned-site
 
-# Test database restore
-wp db import backup.sql
-
-# Test URL replacement
-wp search-replace 'https://live-site.com' 'https://staging-site.com' --all-tables
+# Verify the cloned site
+cd cloned-site
+wp core version
 ```
 
-#### File Migration Test
+### 2. Plugin Update Test
+
 ```bash
-# Test file backup
-tar -czf wp-content-backup.tar.gz wp-content/
+# Test updating a plugin
+./scripts/update-plugins.sh http://localhost:8080 hello-dolly
 
-# Test file restore
-tar -xzf wp-content-backup.tar.gz
-
-# Test permissions
-chmod -R 755 wp-content/
-chown -R www-data:www-data wp-content/
+# Verify the update
+wp plugin list --path=cloned-site
 ```
 
-### 2. Plugin Update Tests
+### 3. Theme Update Test
 
-#### Single Plugin Update Test
 ```bash
-# Test plugin backup
-wp plugin backup woocommerce
+# Test updating a theme
+./scripts/update-themes.sh http://localhost:8080 twentytwenty
 
-# Test plugin update
-wp plugin update woocommerce
-
-# Test plugin activation
-wp plugin activate woocommerce
+# Verify the update
+wp theme list --path=cloned-site
 ```
 
-#### Multiple Plugin Update Test
-```bash
-# Test multiple plugin updates
-wp plugin update --all
+## Test Data
 
-# Test plugin compatibility
-wp plugin list --format=csv
+### Sample Plugin List
+```
+hello-dolly
+akismet
 ```
 
-### 3. Theme Update Tests
-
-#### Single Theme Update Test
-```bash
-# Test theme backup
-wp theme backup twentytwentythree
-
-# Test theme update
-wp theme update twentytwentythree
-
-# Test theme activation
-wp theme activate twentytwentythree
+### Sample Theme List
 ```
-
-#### Multiple Theme Update Test
-```bash
-# Test multiple theme updates
-wp theme update --all
-
-# Test theme compatibility
-wp theme list --format=csv
-```
-
-## Visual Regression Testing
-
-### 1. Test Scenarios
-
-#### Homepage Tests
-```json
-{
-  "label": "Homepage Desktop",
-  "url": "https://staging-site.com",
-  "selectors": ["viewport"],
-  "delay": 5000,
-  "hideSelectors": [
-    ".wp-admin-bar",
-    "#wp-admin-bar-root-default",
-    ".wp-admin-bar-top"
-  ]
-}
-```
-
-#### Plugin Page Tests
-```json
-{
-  "label": "Plugin Page",
-  "url": "https://staging-site.com/wp-admin/plugins.php",
-  "selectors": ["#wpbody-content"],
-  "delay": 3000,
-  "hideSelectors": [
-    ".wp-admin-bar",
-    ".notice",
-    ".update-nag"
-  ]
-}
-```
-
-#### Theme Page Tests
-```json
-{
-  "label": "Theme Page",
-  "url": "https://staging-site.com/wp-admin/themes.php",
-  "selectors": ["#wpbody-content"],
-  "delay": 3000,
-  "hideSelectors": [
-    ".wp-admin-bar",
-    ".notice",
-    ".update-nag"
-  ]
-}
-```
-
-### 2. Responsive Testing
-```json
-{
-  "viewports": [
-    {
-      "label": "desktop",
-      "width": 1920,
-      "height": 1080
-    },
-    {
-      "label": "tablet",
-      "width": 768,
-      "height": 1024
-    },
-    {
-      "label": "mobile",
-      "width": 375,
-      "height": 667
-    }
-  ]
-}
-```
-
-## Performance Testing
-
-### 1. Database Performance
-```bash
-# Test database optimization
-wp db optimize
-
-# Test database repair
-wp db repair
-
-# Test database size
-wp db size
-```
-
-### 2. File System Performance
-```bash
-# Test file permissions
-find wp-content -type f -exec chmod 644 {} \;
-find wp-content -type d -exec chmod 755 {} \;
-
-# Test file ownership
-chown -R www-data:www-data wp-content/
-```
-
-### 3. Load Testing
-```bash
-# Test site response time
-curl -w "\n%{time_total}s\n" -o /dev/null -s https://staging-site.com
-
-# Test database response time
-wp db query "SELECT BENCHMARK(1000000,1+1);"
-```
-
-## Security Testing
-
-### 1. File Permissions
-```bash
-# Test file permissions
-find wp-content -type f -not -perm 644 -ls
-find wp-content -type d -not -perm 755 -ls
-
-# Test sensitive files
-find wp-content -type f -name "*.sql" -ls
-find wp-content -type f -name "*.log" -ls
-```
-
-### 2. Database Security
-```bash
-# Test database user permissions
-wp db check
-
-# Test database encryption
-wp db encrypt
-
-# Test sensitive data
-wp db search "password" --all-tables
-```
-
-### 3. WordPress Security
-```bash
-# Test core integrity
-wp core verify-checksums
-
-# Test plugin integrity
-wp plugin verify-checksums --all
-
-# Test theme integrity
-wp theme verify-checksums --all
-```
-
-## Test Reporting
-
-### 1. Visual Test Reports
-```bash
-# Generate visual test report
-backstop test
-
-# Open test report
-backstop openReport
-```
-
-### 2. Performance Reports
-```bash
-# Generate performance report
-wp site health check
-
-# Export performance data
-wp site health export
-```
-
-### 3. Security Reports
-```bash
-# Generate security report
-wp security check
-
-# Export security data
-wp security export
+twentytwenty
+twentytwentyone
 ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Visual Test Failures**
-   - Check for dynamic content
-   - Verify selectors
-   - Check for timing issues
-   - Review browser console
-
-2. **Performance Issues**
-   - Check database optimization
-   - Verify file permissions
-   - Monitor server resources
-   - Review error logs
-
-3. **Security Issues**
-   - Check file permissions
-   - Verify database access
-   - Review user roles
-   - Check error logs
-
-### Getting Help
-
-1. Check the logs:
+1. Docker Container Issues:
    ```bash
-   tail -f wp-content/debug.log
+   # Check container status
+   docker-compose ps
+   
+   # View container logs
+   docker-compose logs wordpress
    ```
 
-2. Review test reports:
+2. Database Connection Issues:
    ```bash
-   backstop openReport
+   # Check MySQL connection
+   wp db check
+   
+   # Reset database
+   wp db reset --yes
    ```
 
-3. Check system status:
+3. Permission Issues:
    ```bash
-   wp site health check
-   ``` 
+   # Fix permissions
+   sudo chown -R www-data:www-data test-site
+   ```
+
+### Debug Mode
+
+Enable debug mode by setting in wp-config.php:
+```php
+define('WP_DEBUG', true);
+define('WP_DEBUG_LOG', true);
+define('WP_DEBUG_DISPLAY', false);
+```
+
+## Test Reports
+
+Test reports are generated in the following locations:
+
+1. Unit Test Reports:
+   - `test_results/unit/`
+
+2. Integration Test Reports:
+   - `test_results/integration/`
+
+3. Shell Script Test Reports:
+   - `test_results/shell/`
+
+## Continuous Integration
+
+The project includes GitHub Actions workflows for automated testing:
+
+1. Plugin Update Workflow:
+   - Triggered on schedule (weekly)
+   - Can be manually triggered with specific plugins
+
+2. Theme Update Workflow:
+   - Triggered on schedule (weekly)
+   - Can be manually triggered with specific themes
+
+## Best Practices
+
+1. Always run tests in a clean environment
+2. Use the provided test data
+3. Check logs for detailed information
+4. Follow the test sequence: unit → integration → shell
+5. Report any issues with detailed logs
+
+## Support
+
+For testing support:
+1. Check the logs in `logs/`
+2. Review the test reports
+3. Contact the development team 

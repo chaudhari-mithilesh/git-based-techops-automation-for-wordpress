@@ -1,0 +1,45 @@
+FROM node:14
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    php8.1 \
+    php8.1-mysql \
+    php8.1-curl \
+    php8.1-gd \
+    php8.1-mbstring \
+    php8.1-xml \
+    php8.1-zip \
+    mysql-client \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install WP-CLI
+RUN curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar \
+    && chmod +x wp-cli.phar \
+    && mv wp-cli.phar /usr/local/bin/wp
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy project files
+COPY . .
+
+# Make scripts executable
+RUN chmod +x scripts/*.sh \
+    && chmod +x tests/*.sh
+
+# Set environment variables
+ENV WP_CLI_CONFIG_PATH=/app/wp-cli.yml
+ENV PATH="/app/node_modules/.bin:${PATH}"
+
+# Create wp-cli.yml
+RUN echo "path: /var/www/html" > wp-cli.yml
+
+# Default command
+CMD ["npm", "run", "test"] 

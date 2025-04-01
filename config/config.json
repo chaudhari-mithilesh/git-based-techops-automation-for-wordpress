@@ -1,0 +1,39 @@
+{
+    "wordpress": {
+        "wp_cli_path": "/usr/local/bin/wp",
+        "backup_dir": "backups",
+        "temp_dir": "temp",
+        "max_backups": 5
+    },
+    "git": {
+        "default_branch": "main",
+        "commit_message_prefix": "[TechOps]",
+        "pr_template": ".github/pull_request_template.md"
+    },
+    "logging": {
+        "level": "INFO",
+        "file": "logs/techops.log",
+        "max_size": "10M",
+        "max_files": 5
+    },
+    "notifications": {
+        "slack_webhook": "",
+        "email": {
+            "smtp_server": "",
+            "smtp_port": 587,
+            "from_address": "",
+            "to_addresses": []
+        }
+    },
+    "security": {
+        "ssh_key_path": "~/.ssh/id_rsa",
+        "encryption_key": "",
+        "allowed_ips": []
+    },
+    "testing": {
+        "test_site_url": "http://localhost:8080",
+        "test_db_prefix": "test_",
+        "test_user": "admin",
+        "test_password": "password"
+    }
+} 
