@@ -181,4 +181,88 @@ cleanup() {
 }
 
 # Register cleanup function
-trap cleanup EXIT 
+trap cleanup EXIT
+
+# Backup function
+create_backup() {
+    local source="$1"
+    local backup_dir="$2"
+    local timestamp=$(date +%Y%m%d_%H%M%S)
+    
+    log_info "Creating backup of $source"
+    
+    # Create backup directory if it doesn't exist
+    mkdir -p "$backup_dir"
+    
+    # Create backup
+    tar -czf "$backup_dir/backup_$timestamp.tar.gz" "$source"
+    
+    if [ $? -eq 0 ]; then
+        log_info "Backup created successfully at $backup_dir/backup_$timestamp.tar.gz"
+    else
+        log_error "Failed to create backup"
+        exit 1
+    fi
+}
+
+# Restore function
+restore_backup() {
+    local backup_file="$1"
+    local target="$2"
+    
+    log_info "Restoring backup from $backup_file to $target"
+    
+    # Extract backup
+    tar -xzf "$backup_file" -C "$target"
+    
+    if [ $? -eq 0 ]; then
+        log_info "Backup restored successfully"
+    else
+        log_error "Failed to restore backup"
+        exit 1
+    fi
+}
+
+# Check command exists
+check_command() {
+    local cmd="$1"
+    
+    if ! command -v "$cmd" &> /dev/null; then
+        log_error "Required command '$cmd' is not installed"
+        exit 1
+    fi
+}
+
+# Validate WordPress installation
+validate_wordpress() {
+    local path="$1"
+    
+    log_info "Validating WordPress installation at $path"
+    
+    if [ ! -f "$path/wp-config.php" ]; then
+        log_error "WordPress installation not found at $path"
+        exit 1
+    fi
+    
+    if [ ! -d "$path/wp-content" ]; then
+        log_error "WordPress content directory not found at $path/wp-content"
+        exit 1
+    fi
+    
+    log_info "WordPress installation validated successfully"
+}
+
+# Update file permissions
+update_permissions() {
+    local path="$1"
+    local user="$2"
+    local group="$3"
+    local perms="$4"
+    
+    log_info "Updating permissions for $path"
+    
+    chown -R "$user:$group" "$path"
+    chmod -R "$perms" "$path"
+    
+    log_info "Permissions updated successfully"
+} 

@@ -1,68 +1,67 @@
 #!/bin/bash
 
-# Exit on error
-set -e
+# Source utility functions
+source "$(dirname "$0")/utils.sh"
 
-# Log function
-log() {
-    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1"
+# Configuration
+SITE_URL="$1"
+PLUGINS="$2"
+UPDATE_TYPE="$3"
+
+# Validate inputs
+if [ -z "$SITE_URL" ]; then
+  log_error "Site URL is required"
+  exit 1
+fi
+
+if [ -z "$UPDATE_TYPE" ]; then
+  UPDATE_TYPE="all"
+fi
+
+# Function to update a single plugin
+update_plugin() {
+  local plugin="$1"
+  log_info "Updating plugin: $plugin"
+  
+  # Get current version
+  local current_version=$(wp plugin list --path="$SITE_URL" --format=csv --fields=name,version | grep "^$plugin," | cut -d',' -f2)
+  
+  # Update plugin
+  wp plugin update "$plugin" --path="$SITE_URL" --skip-plugins --skip-themes
+  
+  # Get new version
+  local new_version=$(wp plugin list --path="$SITE_URL" --format=csv --fields=name,version | grep "^$plugin," | cut -d',' -f2)
+  
+  if [ "$current_version" != "$new_version" ]; then
+    log_success "Plugin $plugin updated from $current_version to $new_version"
+    return 0
+  else
+    log_info "Plugin $plugin is already up to date"
+    return 1
+  fi
 }
 
-# Error function
-error() {
-    echo "[ERROR] $(date +'%Y-%m-%d %H:%M:%S')] $1" >&2
-    exit 1
-}
-
-# Create backup function
-create_backup() {
-    local host=$1
-    local user=$2
-    local site_path=$3
-    local backup_dir=$4
-    
-    log "Creating backup on $host..."
-    
-    # Create backup directory
-    ssh -o StrictHostKeyChecking=no "$user@$host" "mkdir -p $backup_dir"
-    
-    # Backup plugins directory
-    ssh -o StrictHostKeyChecking=no "$user@$host" "tar -czf $backup_dir/plugins_backup.tar.gz $site_path/wp-content/plugins"
-    
-    log "Backup completed on $host"
-}
-
-# Main update process
+# Main function
 main() {
-    # Set site path
-    local site_path="/var/www/html/$SITE_NAME"
-    local backup_dir="/tmp/backups/plugins/$SITE_NAME"
+  log_info "Starting plugin update process for $SITE_URL"
+  
+  if [ "$UPDATE_TYPE" = "all" ]; then
+    # Get all installed plugins
+    local plugins=$(wp plugin list --path="$SITE_URL" --format=csv --fields=name --skip-plugins --skip-themes)
     
-    # Create backup
-    create_backup "$STAGING_HOST" "$STAGING_USER" "$site_path" "$backup_dir"
-    
-    # Update plugins based on type
-    if [ "$UPDATE_TYPE" = "all" ]; then
-        log "Updating all plugins..."
-        ssh -o StrictHostKeyChecking=no "$STAGING_USER@$STAGING_HOST" "cd $site_path && wp plugin update --all --allow-root"
-    else
-        log "Updating selected plugins: $PLUGIN_LIST"
-        IFS=',' read -ra PLUGINS <<< "$PLUGIN_LIST"
-        for plugin in "${PLUGINS[@]}"; do
-            log "Updating plugin: $plugin"
-            ssh -o StrictHostKeyChecking=no "$STAGING_USER@$STAGING_HOST" "cd $site_path && wp plugin update $plugin --allow-root"
-        done
-    fi
-    
-    # Update file permissions
-    log "Updating file permissions..."
-    ssh -o StrictHostKeyChecking=no "$STAGING_USER@$STAGING_HOST" "chown -R www-data:www-data $site_path/wp-content/plugins && chmod -R 755 $site_path/wp-content/plugins"
-    
-    # Cleanup
-    log "Cleaning up temporary files..."
-    ssh -o StrictHostKeyChecking=no "$STAGING_USER@$STAGING_HOST" "rm -rf $backup_dir"
-    
-    log "Plugin updates completed successfully!"
+    # Update each plugin
+    for plugin in $plugins; do
+      update_plugin "$plugin"
+    done
+  else
+    # Update specified plugins
+    IFS=',' read -ra PLUGIN_ARRAY <<< "$PLUGINS"
+    for plugin in "${PLUGIN_ARRAY[@]}"; do
+      update_plugin "$plugin"
+    done
+  fi
+  
+  log_success "Plugin update process completed"
 }
 
 # Run main function

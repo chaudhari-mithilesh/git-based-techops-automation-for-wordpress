@@ -1,0 +1,59 @@
+name: Backup WordPress Site
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Run daily at midnight
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Create Backup
+        env:
+          SITE_URL: ${{ secrets.WORDPRESS_SITE_URL }}
+          DB_NAME: ${{ secrets.WORDPRESS_DB_NAME }}
+          DB_USER: ${{ secrets.WORDPRESS_DB_USER }}
+          DB_PASSWORD: ${{ secrets.WORDPRESS_DB_PASSWORD }}
+        run: |
+          node scripts/backup-site.js
+
+      - name: Upload Backup
+        uses: actions/upload-artifact@v3
+        with:
+          name: wordpress-backup
+          path: backups/
+          retention-days: 7
+
+      - name: Notify on Success
+        if: success()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ Backup completed successfully!'
+            })
+
+      - name: Notify on Failure
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '❌ Backup failed! Please check the logs for details.'
+            }) 

@@ -1,68 +1,67 @@
 #!/bin/bash
 
-# Exit on error
-set -e
+# Source utility functions
+source "$(dirname "$0")/utils.sh"
 
-# Log function
-log() {
-    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1"
+# Configuration
+SITE_URL="$1"
+THEMES="$2"
+UPDATE_TYPE="$3"
+
+# Validate inputs
+if [ -z "$SITE_URL" ]; then
+  log_error "Site URL is required"
+  exit 1
+fi
+
+if [ -z "$UPDATE_TYPE" ]; then
+  UPDATE_TYPE="all"
+fi
+
+# Function to update a single theme
+update_theme() {
+  local theme="$1"
+  log_info "Updating theme: $theme"
+  
+  # Get current version
+  local current_version=$(wp theme list --path="$SITE_URL" --format=csv --fields=name,version | grep "^$theme," | cut -d',' -f2)
+  
+  # Update theme
+  wp theme update "$theme" --path="$SITE_URL" --skip-plugins --skip-themes
+  
+  # Get new version
+  local new_version=$(wp theme list --path="$SITE_URL" --format=csv --fields=name,version | grep "^$theme," | cut -d',' -f2)
+  
+  if [ "$current_version" != "$new_version" ]; then
+    log_success "Theme $theme updated from $current_version to $new_version"
+    return 0
+  else
+    log_info "Theme $theme is already up to date"
+    return 1
+  fi
 }
 
-# Error function
-error() {
-    echo "[ERROR] $(date +'%Y-%m-%d %H:%M:%S')] $1" >&2
-    exit 1
-}
-
-# Create backup function
-create_backup() {
-    local host=$1
-    local user=$2
-    local site_path=$3
-    local backup_dir=$4
-    
-    log "Creating backup on $host..."
-    
-    # Create backup directory
-    ssh -o StrictHostKeyChecking=no "$user@$host" "mkdir -p $backup_dir"
-    
-    # Backup themes directory
-    ssh -o StrictHostKeyChecking=no "$user@$host" "tar -czf $backup_dir/themes_backup.tar.gz $site_path/wp-content/themes"
-    
-    log "Backup completed on $host"
-}
-
-# Main update process
+# Main function
 main() {
-    # Set site path
-    local site_path="/var/www/html/$SITE_NAME"
-    local backup_dir="/tmp/backups/themes/$SITE_NAME"
+  log_info "Starting theme update process for $SITE_URL"
+  
+  if [ "$UPDATE_TYPE" = "all" ]; then
+    # Get all installed themes
+    local themes=$(wp theme list --path="$SITE_URL" --format=csv --fields=name --skip-plugins --skip-themes)
     
-    # Create backup
-    create_backup "$STAGING_HOST" "$STAGING_USER" "$site_path" "$backup_dir"
-    
-    # Update themes based on type
-    if [ "$UPDATE_TYPE" = "all" ]; then
-        log "Updating all themes..."
-        ssh -o StrictHostKeyChecking=no "$STAGING_USER@$STAGING_HOST" "cd $site_path && wp theme update --all --allow-root"
-    else
-        log "Updating selected themes: $THEME_LIST"
-        IFS=',' read -ra THEMES <<< "$THEME_LIST"
-        for theme in "${THEMES[@]}"; do
-            log "Updating theme: $theme"
-            ssh -o StrictHostKeyChecking=no "$STAGING_USER@$STAGING_HOST" "cd $site_path && wp theme update $theme --allow-root"
-        done
-    fi
-    
-    # Update file permissions
-    log "Updating file permissions..."
-    ssh -o StrictHostKeyChecking=no "$STAGING_USER@$STAGING_HOST" "chown -R www-data:www-data $site_path/wp-content/themes && chmod -R 755 $site_path/wp-content/themes"
-    
-    # Cleanup
-    log "Cleaning up temporary files..."
-    ssh -o StrictHostKeyChecking=no "$STAGING_USER@$STAGING_HOST" "rm -rf $backup_dir"
-    
-    log "Theme updates completed successfully!"
+    # Update each theme
+    for theme in $themes; do
+      update_theme "$theme"
+    done
+  else
+    # Update specified themes
+    IFS=',' read -ra THEME_ARRAY <<< "$THEMES"
+    for theme in "${THEME_ARRAY[@]}"; do
+      update_theme "$theme"
+    done
+  fi
+  
+  log_success "Theme update process completed"
 }
 
 # Run main function
